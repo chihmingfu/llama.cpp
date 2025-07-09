@@ -2,6 +2,19 @@ cmake_minimum_required(VERSION 3.14) # for add_link_options and implicit target 
 project("llama.cpp" C CXX)
 include(CheckIncludeFileCXX)
 
+# 設置 C++17 標準
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# 現有內容（請保留原文件中的其他內容）
+# ... 其他 CMake 配置 ...
+
+# 為所有目標添加 libstdc++fs 鏈接（針對 std::filesystem）
+if (CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+    link_libraries(stdc++fs)
+endif()
+
+
 #set(CMAKE_WARN_DEPRECATED YES)
 set(CMAKE_WARN_UNUSED_CLI YES)
 
