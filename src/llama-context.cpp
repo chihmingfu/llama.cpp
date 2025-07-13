@@ -2,6 +2,7 @@
 
 #include "llama-impl.h"
 #include "llama-batch.h"
+#include "llama-fake-quant.h"
 #include "llama-io.h"
 #include "llama-memory.h"
 #include "llama-mmap.h"
@@ -502,6 +503,11 @@ enum llama_pooling_type llama_context::pooling_type() const {
 }
 
 float * llama_context::get_logits() {
+    // Apply fake quantization to logits if enabled
+    if (cparams.fake_quant_enabled && logits != nullptr) {
+        const size_t n_vocab = model.vocab.n_tokens();
+        llama_fake_quantize_data(logits, n_vocab * n_outputs, cparams.fake_quant_type);
+    }
     return logits;
 }
 
@@ -532,7 +538,14 @@ float * llama_context::get_logits_ith(int32_t i) {
             throw std::runtime_error(format("corrupt output buffer (j=%" PRId64 ", n_outputs=%d)", j, n_outputs));
         }
 
-        return logits + j*model.vocab.n_tokens();
+        float * token_logits = logits + j*model.vocab.n_tokens();
+        
+        // Apply fake quantization to this token's logits if enabled
+        if (cparams.fake_quant_enabled) {
+            llama_fake_quantize_data(token_logits, model.vocab.n_tokens(), cparams.fake_quant_type);
+        }
+        
+        return token_logits;
     } catch (const std::exception & err) {
         LLAMA_LOG_ERROR("%s: invalid logits id %d, reason: %s\n", __func__, i, err.what());
 #ifndef NDEBUG
