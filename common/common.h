@@ -346,6 +346,12 @@ struct common_params {
     ggml_type cache_type_k = GGML_TYPE_F16; // KV cache data type for the K
     ggml_type cache_type_v = GGML_TYPE_F16; // KV cache data type for the V
 
+    // fake quantization params
+    bool fake_quant_enabled = false;                  // enable fake quantization
+    ggml_type fake_quant_type = GGML_TYPE_BF16;       // target quantization type for fake quantization
+    float fake_quant_scale = 1.0f;                    // quantization scale factor (0.0-1.0, 1.0=all layers)
+    bool fake_quant_compare = false;                  // output comparison between original and fake quantized
+
     common_conversation_mode conversation_mode = COMMON_CONVERSATION_MODE_AUTO;
 
     // multimodal models (see tools/mtmd)

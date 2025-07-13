@@ -73,6 +73,9 @@ cmake --build build
 # Build with fatal warnings
 cmake -B build -DLLAMA_FATAL_WARNINGS=ON
 cmake --build build --config Release
+
+# Install built binaries to system (optional)
+cmake --install build --prefix /usr/local
 ```
 
 ## Testing
@@ -254,3 +257,51 @@ All tools are built to `build/bin/` directory:
 
 **Runtime:**
 - No major external dependencies for core library (self-contained)
+
+## Important Implementation Details
+
+**Core Architecture Flow:**
+- Model loading: `llama-model-loader.cpp` → `llama-model.cpp` → `llama-arch.cpp` (architecture-specific)
+- Inference pipeline: `llama-context.cpp` manages state, `llama-sampling.cpp` handles generation
+- Memory management: Multiple cache types via `llama-memory*.cpp` and unified KV cache
+- Backend dispatch: GGML handles compute backend selection (CPU/CUDA/Metal/etc.)
+
+**Key Configuration Points:**
+- Model architecture detection in `llama-arch.cpp` with 100+ supported model types
+- Context parameters in `llama-cparams.cpp` control memory and performance
+- Hyperparameters in `llama-hparams.cpp` define model-specific settings
+- Vocabulary handling in `llama-vocab.cpp` supports multiple tokenizer types
+
+**Thread Safety and Performance:**
+- Core library is thread-safe for concurrent inference contexts
+- Batch processing supported via `llama-batch.cpp` for efficient parallel generation
+- Memory-mapped model loading via `llama-mmap.cpp` for fast startup and memory efficiency
+- SIMD optimizations handled automatically by GGML backend
+
+## Debugging and Troubleshooting
+
+**Common Debug Workflows:**
+```bash
+# Debug build with verbose output
+cmake -B build -DCMAKE_BUILD_TYPE=Debug -DLLAMA_DEBUG=ON
+cmake --build build
+
+# Run with debug logging
+LLAMA_LOG_LEVEL=debug ./build/bin/llama-cli -m model.gguf
+
+# Memory debugging
+cmake -B build -DCMAKE_BUILD_TYPE=Debug -DLLAMA_SANITIZE_ADDRESS=ON
+cmake --build build
+```
+
+**Performance Analysis:**
+- Use `llama-bench` for standardized performance testing
+- Monitor GPU utilization with `nvidia-smi` (CUDA) or `rocm-smi` (ROCm)
+- Profile with `perf`, `gprof`, or platform-specific tools
+- Check model compatibility with target hardware before optimization
+
+**Model Conversion Issues:**
+- Use `convert_hf_to_gguf.py` for Hugging Face models
+- Verify model architecture support in `src/llama-arch.cpp`
+- Check tokenizer compatibility in conversion process
+- Test converted models with simple inference before full deployment

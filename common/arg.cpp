@@ -2110,6 +2110,36 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
         }
     ).set_env("LLAMA_ARG_CACHE_TYPE_V"));
     add_opt(common_arg(
+        {"--fake-quant"}, "TYPE",
+        string_format(
+            "enable fake quantization with specified type\n"
+            "allowed values: %s\n"
+            "(default: disabled)",
+            get_all_kv_cache_types().c_str()
+        ),
+        [](common_params & params, const std::string & value) {
+            params.fake_quant_enabled = true;
+            params.fake_quant_type = kv_cache_type_from_str(value);
+        }
+    ).set_env("LLAMA_ARG_FAKE_QUANT"));
+    add_opt(common_arg(
+        {"--fake-quant-scale"}, "FLOAT",
+        string_format("fake quantization scale factor (0.0-1.0, 1.0=all layers) (default: %.1f)", params.fake_quant_scale),
+        [](common_params & params, const std::string & value) {
+            params.fake_quant_scale = std::stof(value);
+            if (params.fake_quant_scale < 0.0f || params.fake_quant_scale > 1.0f) {
+                throw std::runtime_error("fake quantization scale must be between 0.0 and 1.0");
+            }
+        }
+    ).set_env("LLAMA_ARG_FAKE_QUANT_SCALE"));
+    add_opt(common_arg(
+        {"--fake-quant-compare"},
+        "output comparison between original and fake quantized results",
+        [](common_params & params) {
+            params.fake_quant_compare = true;
+        }
+    ).set_env("LLAMA_ARG_FAKE_QUANT_COMPARE"));
+    add_opt(common_arg(
         {"--hellaswag"},
         "compute HellaSwag score over random tasks from datafile supplied with -f",
         [](common_params & params) {

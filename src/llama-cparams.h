@@ -34,6 +34,11 @@ struct llama_cparams {
     bool warmup;
     bool op_offload;
 
+    // fake quantization parameters
+    bool fake_quant_enabled;
+    enum ggml_type fake_quant_type;
+    float fake_quant_scale;
+
     enum llama_pooling_type pooling_type;
 
     ggml_backend_sched_eval_callback cb_eval;

@@ -57,6 +57,16 @@ llama_context::llama_context(
 
     cparams.cb_eval           = params.cb_eval;
     cparams.cb_eval_user_data = params.cb_eval_user_data;
+    
+    // fake quantization parameters
+    cparams.fake_quant_enabled = params.fake_quant_enabled;
+    cparams.fake_quant_type = params.fake_quant_type;
+    cparams.fake_quant_scale = params.fake_quant_scale;
+    
+    if (cparams.fake_quant_enabled) {
+        LLAMA_LOG_INFO("%s: fake quantization enabled: type=%s scale=%.2f\n", 
+                       __func__, ggml_type_name(cparams.fake_quant_type), cparams.fake_quant_scale);
+    }
 
     auto rope_scaling_type = params.rope_scaling_type;
     if (rope_scaling_type == LLAMA_ROPE_SCALING_TYPE_UNSPECIFIED) {
@@ -2179,6 +2189,9 @@ llama_context_params llama_context_default_params() {
         /*.cb_eval_user_data           =*/ nullptr,
         /*.type_k                      =*/ GGML_TYPE_F16,
         /*.type_v                      =*/ GGML_TYPE_F16,
+        /*.fake_quant_enabled          =*/ false,
+        /*.fake_quant_type             =*/ GGML_TYPE_BF16,
+        /*.fake_quant_scale            =*/ 1.0f,
         /*.abort_callback              =*/ nullptr,
         /*.abort_callback_data         =*/ nullptr,
         /*.embeddings                  =*/ false,
