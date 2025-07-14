@@ -8,6 +8,8 @@
 #include "vec.h"
 
 #include <float.h>
+#include <unistd.h>
+#include <sys/syscall.h>
 
 // Fake quantization state for GGML-level operations
 static struct {
@@ -16,11 +18,29 @@ static struct {
     int target_layer;
 } g_ggml_fake_quant_state = {false, 0, -1};
 
+// Track which layers have been quantized (first call only)
+static bool g_layer_quantized[256] = {false}; // Support up to 256 layers
+static int g_total_quantizations = 0;
+static int g_call_count[256] = {0}; // Track total calls per layer
+static int g_global_call_count = 0; // Track all RMS norm calls
+
 // Set global fake quantization parameters for GGML-level operations
 void ggml_fake_quant_set_global_params(bool enabled, int target_type, int target_layer) {
     g_ggml_fake_quant_state.enabled = enabled;
     g_ggml_fake_quant_state.target_type = target_type;
     g_ggml_fake_quant_state.target_layer = target_layer;
+    
+    // Reset layer tracking when parameters change
+    for (int i = 0; i < 256; i++) {
+        g_layer_quantized[i] = false;
+        g_call_count[i] = 0;
+    }
+    g_total_quantizations = 0;
+    g_global_call_count = 0;
+    
+    if (enabled) {
+        printf("GGML fake quantization enabled: target_layer=%d (first-call-only mode)\n", target_layer);
+    }
 }
 
 // Apply BF16 fake quantization to data
@@ -31,43 +51,58 @@ static void apply_bf16_fake_quant(float * data, size_t n_elements) {
     }
 }
 
-// Counter to track normalization operations per layer
-static int g_norm_counter = 0;
-static int g_current_layer = -1;
-
-// Check if fake quantization should be applied to RMS norm result
+// IMPROVED: First-call-only quantization to avoid redundancy
 static bool should_apply_fake_quant_rms_norm(const struct ggml_tensor * tensor) {
     if (!g_ggml_fake_quant_state.enabled || !tensor || !tensor->name) {
         return false;
     }
     
-    // Try to extract layer number from norm tensor name (e.g., "norm-21")
     int layer_num = -1;
-    if (sscanf(tensor->name, "norm-%d", &layer_num) == 1) {
-        // Reset counter when moving to new layer
-        if (layer_num != g_current_layer) {
-            g_current_layer = layer_num;
-            g_norm_counter = 0;
-        }
-        g_norm_counter++;
-        
-        // In transformer architecture, typically:
-        // 1st norm per layer = attention norm
-        // 2nd norm per layer = FFN norm
-        // We want the FFN norm (2nd occurrence per layer)
-        bool is_ffn_norm = (g_norm_counter == 2);
-        
-        // Check if this is the target layer and FFN norm
-        bool is_target_layer = (g_ggml_fake_quant_state.target_layer == -1 || layer_num == g_ggml_fake_quant_state.target_layer);
-        
-        return is_target_layer && is_ffn_norm;
-    }
     
-    // Also check for original naming pattern (blk.X.ffn_norm)
+    // Method 1: Direct FFN norm pattern matching (more reliable)
     if (strstr(tensor->name, "ffn_norm") != NULL) {
         if (sscanf(tensor->name, "blk.%d.ffn_norm", &layer_num) == 1) {
-            return (g_ggml_fake_quant_state.target_layer == -1 || layer_num == g_ggml_fake_quant_state.target_layer);
+            bool is_target_layer = (g_ggml_fake_quant_state.target_layer == -1 || 
+                                   layer_num == g_ggml_fake_quant_state.target_layer);
+            
+            // Apply first-call-only logic
+            if (is_target_layer && layer_num >= 0 && layer_num < 256) {
+                if (!g_layer_quantized[layer_num]) {
+                    g_layer_quantized[layer_num] = true;
+                    g_total_quantizations++;
+                    printf("FFN NORM FIRST CALL: %s (layer %d, total=%d)\n", 
+                           tensor->name, layer_num, g_total_quantizations);
+                    return true;
+                }
+            }
+            return false;
         }
+    }
+    
+    // Method 2: Pattern-based approach for norm-X (TinyLlama uses this)
+    if (sscanf(tensor->name, "norm-%d", &layer_num) == 1) {
+        bool is_target_layer = (g_ggml_fake_quant_state.target_layer == -1 || 
+                               layer_num == g_ggml_fake_quant_state.target_layer);
+        
+        // Get thread information for analysis
+        pid_t tid = syscall(SYS_gettid);
+        
+        // Track all calls regardless of quantization
+        if (layer_num >= 0 && layer_num < 256) {
+            g_call_count[layer_num]++;
+            g_global_call_count++;
+        }
+        
+        // Apply first-call-only quantization logic
+        if (is_target_layer && layer_num >= 0 && layer_num < 256) {
+            if (!g_layer_quantized[layer_num]) {
+                g_layer_quantized[layer_num] = true;
+                g_total_quantizations++;
+                return true;
+            }
+        }
+        // Other layers: no action needed
+        return false;
     }
     
     return false;
@@ -90,10 +125,9 @@ static void apply_fake_quant_rms_norm_result(float * data, size_t n_elements, co
     float quantized_first = data[0];
     float quantized_last = data[n_elements - 1];
     
-    printf("FFN norm fake quantization (BF16): %s - diff: first=%.6f, last=%.6f\n", 
-           tensor_name ? tensor_name : "unknown",
-           fabs(original_first - quantized_first),
-           fabs(original_last - quantized_last));
+    // Quantization verification (debug output disabled for performance)
+    (void)original_first; (void)original_last;
+    (void)quantized_first; (void)quantized_last; (void)tensor_name;
 }
 
 // ggml_compute_forward_dup
