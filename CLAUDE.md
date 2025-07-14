@@ -180,6 +180,7 @@ All tools are built to `build/bin/` directory:
 - `llama-memory*.cpp` - Memory management for different cache types
 - `llama-grammar.cpp` - Grammar-guided generation support
 - `llama-chat.cpp` - Chat template processing
+- `llama-fake-quant.cpp` - Fake quantization for precision analysis
 
 **Tools architecture:**
 - `tools/main/` - llama-cli implementation
@@ -226,6 +227,7 @@ All tools are built to `build/bin/` directory:
 - Multimodal support in `llama-server`
 - Universal function calling support
 - GGUF-my-LoRA for LoRA conversion and merging
+- Fake quantization support for precision analysis (`--fake-quant` flag)
 
 ## Development Workflow
 
@@ -305,3 +307,16 @@ cmake --build build
 - Verify model architecture support in `src/llama-arch.cpp`
 - Check tokenizer compatibility in conversion process
 - Test converted models with simple inference before full deployment
+
+**Precision Analysis:**
+```bash
+# Test model precision with fake quantization
+./build/bin/llama-cli -m model.gguf --fake-quant bf16 --fake-quant-scale 1.0
+
+# Compare outputs with different precision levels
+./build/bin/llama-cli -m model.gguf --fake-quant-compare
+
+# Environment variables for fake quantization
+export LLAMA_ARG_FAKE_QUANT="bf16"
+export LLAMA_ARG_FAKE_QUANT_SCALE="1.0"
+```

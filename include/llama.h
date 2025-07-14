@@ -364,6 +364,10 @@ extern "C" {
         bool fake_quant_enabled;     // enable fake quantization
         enum ggml_type fake_quant_type; // target type for fake quantization
         float fake_quant_scale;      // scale factor (0.0-1.0, 1.0=all layers)
+        
+        // FFN norm fake quantization
+        bool fake_quant_ffn_norm_enabled; // enable FFN norm fake quantization
+        int fake_quant_target_layer;    // target layer for FFN norm fake quantization
 
         // Abort callback
         // if it returns true, execution of llama_decode() will be aborted

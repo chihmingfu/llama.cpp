@@ -2205,6 +2205,8 @@ llama_context_params llama_context_default_params() {
         /*.fake_quant_enabled          =*/ false,
         /*.fake_quant_type             =*/ GGML_TYPE_BF16,
         /*.fake_quant_scale            =*/ 1.0f,
+        /*.fake_quant_ffn_norm_enabled =*/ false,
+        /*.fake_quant_target_layer     =*/ 21,
         /*.abort_callback              =*/ nullptr,
         /*.abort_callback_data         =*/ nullptr,
         /*.embeddings                  =*/ false,

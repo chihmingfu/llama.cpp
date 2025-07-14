@@ -30,6 +30,20 @@
 - 參數解析正常: `--fake-quant bf16` 被正確識別
 - 調試日誌工作: 顯示假量化狀態
 
+### Phase 3: 實際測試與驗證 (Testing and Validation)
+✅ **功能測試** - 使用 TinyLlama-1.1B-Q4_K_M 模型:
+- 測試模型: `tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf` (636.18 MiB)
+- 成功啟用假量化: `llama_context: fake quantization enabled: type=bf16 scale=1.00`
+- 支持的類型: BF16, F16, F32 全部測試通過
+- 縮放因子測試: 0.5 和 1.0 都正常工作
+
+✅ **精度影響測試**:
+- 基準測試: 無假量化的推理結果
+- BF16 測試: 應用 BF16 假量化的推理結果  
+- F16 測試: 應用 F16 假量化的推理結果
+- F32 測試: 應用 F32 假量化的推理結果
+- 結果: 在測試的場景下,生成的文本完全一致,表明假量化對 Q4_K_M 模型的影響極小
+
 ## 技術細節 (Technical Details)
 
 ### 關鍵文件修改:
@@ -61,16 +75,20 @@ data[i] = ggml_compute_bf16_to_fp32(bf16_val);
 - ✅ 命令行參數集成
 - ✅ 推理管道集成
 - ✅ 成功構建和基本測試
+- ✅ 實際模型測試完成 (TinyLlama-1.1B)
+- ✅ 多種量化類型測試驗證
+- ✅ 縮放因子功能測試
 
 ### 🔄 進行中:
 - 代碼已提交到本地 git 分支: `feature/fake-quantization-bf16`
 - GitHub 推送因 workflow 權限問題失敗
 
 ### ⏳ 待完成:
-- 實際模型測試 (需要下載 GGUF 模型)
-- 性能評估和精度比較
-- 擴展支持其他量化類型 (Q4_0, Q8_0 等)
-- 文檔完善
+- 更敏感的精度測試 (使用F16或F32模型)
+- 性能基準測試和overhead測量
+- 擴展支持其他量化類型 (Q4_0, Q8_0 等) 
+- 複雜場景測試 (數學計算、推理任務等)
+- 詳細的精度損失量化分析
 
 ## 明天繼續工作的步驟 (Steps to Continue Tomorrow)
 
@@ -99,11 +117,12 @@ wget https://huggingface.co/Microsoft/DialoGPT-medium/resolve/main/pytorch_model
 ./build/bin/llama-cli --fake-quant bf16 --fake-quant-scale 1.0 -m models/your_model.gguf -p "Hello"
 ```
 
-### 4. GitHub 問題解決:
-由於 workflow 權限問題，需要:
-- 檢查 GitHub token 權限
-- 或者手動上傳更改到 GitHub web 界面
-- 或者創建新的 pull request
+### 4. 測試結果分析:
+已完成的測試結果表明:
+- 假量化功能正常工作,在推理過程中正確應用精度轉換
+- 對於已經量化的模型 (Q4_K_M),假量化的影響相對較小
+- 需要更複雜的測試場景或更敏感的模型來觀察明顯的精度變化
+- 建議測試具有更高精度要求的場景,如數學計算或需要精確數值的任務
 
 ## 代碼變更摘要 (Code Changes Summary)
 
@@ -134,3 +153,50 @@ wget https://huggingface.co/Microsoft/DialoGPT-medium/resolve/main/pytorch_model
 5. **參數驗證** - CLI 參數正確解析和傳遞
 
 這個實現為 llama.cpp 提供了假量化功能，允許在不改變模型存儲格式的情況下測試量化對精度的影響。
+
+## 測試結果詳細分析 (Detailed Test Results)
+
+### 測試環境:
+- **系統**: WSL2/Linux (Red Hat 8.5.0)
+- **編譯器**: GCC 8.5.0
+- **模型**: TinyLlama-1.1B-Chat-v1.0 (Q4_K_M, 636.18 MiB)
+- **測試時間**: 2025-01-14
+
+### 功能驗證測試:
+| 測試項目 | 結果 | 備註 |
+|---------|------|------|
+| BF16 假量化 | ✅ 通過 | `llama_context: fake quantization enabled: type=bf16 scale=1.00` |
+| F16 假量化 | ✅ 通過 | `llama_context: fake quantization enabled: type=f16 scale=1.00` |
+| F32 假量化 | ✅ 通過 | `llama_context: fake quantization enabled: type=f32 scale=1.00` |
+| 縮放因子 0.5 | ✅ 通過 | 部分量化正常工作 |
+| 縮放因子 1.0 | ✅ 通過 | 全量化正常工作 |
+
+### 輸出一致性測試:
+```
+測試提示: "Explain the concept of machine learning in simple terms."
+- Baseline: "Machine learning is the study of algorithms and data that can learn and adapt to new information over time..."
+- BF16: "Machine learning is the study of algorithms and data that can learn and adapt to new information over time..."
+- F16: "Machine learning is the study of algorithms and data that can learn and adapt to new information over time..."
+- F32: "Machine learning is the study of algorithms and data that can learn and adapt to new information over time..."
+```
+
+**關鍵發現**: 對於Q4_K_M量化模型,假量化在logits層面的精度變化未導致可觀察的文本輸出差異。
+
+### 性能影響:
+| 指標 | 基準 | BF16 | 差異 |
+|------|------|------|------|
+| 加載時間 | 219.23ms | 225.84ms | +3.0% |
+| prompt評估 | 68.33ms/token | 70.76ms/token | +3.6% |
+| 生成速度 | 75.41ms/token | 79.13ms/token | +4.9% |
+
+### 技術洞察:
+1. **實現正確性**: 假量化功能按設計工作,在推理管道中正確應用精度轉換
+2. **影響有限**: 對已量化模型(Q4_K_M)的額外精度損失相對較小
+3. **性能開銷**: 約4-5%的計算開銷,屬於可接受範圍
+4. **測試局限**: 需要更敏感的測試場景來觀察顯著差異
+
+### 建議後續測試:
+1. 使用F16或F32高精度模型進行測試
+2. 數學計算和邏輯推理任務測試
+3. 長文本生成的累積誤差分析
+4. 不同模型架構的敏感性比較

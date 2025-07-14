@@ -1165,6 +1165,10 @@ struct llama_context_params common_context_params_to_llama(const common_params &
     cparams.fake_quant_enabled = params.fake_quant_enabled;
     cparams.fake_quant_type = params.fake_quant_type;
     cparams.fake_quant_scale = params.fake_quant_scale;
+    
+    // FFN norm fake quantization
+    cparams.fake_quant_ffn_norm_enabled = params.fake_quant_ffn_norm_enabled;
+    cparams.fake_quant_target_layer = params.fake_quant_target_layer;
 
     return cparams;
 }

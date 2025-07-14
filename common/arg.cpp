@@ -2140,6 +2140,26 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
         }
     ).set_env("LLAMA_ARG_FAKE_QUANT_COMPARE"));
     add_opt(common_arg(
+        {"--fake-quant-ffn-norm"}, "TYPE",
+        string_format(
+            "enable FFN norm fake quantization with specified type\n"
+            "allowed values: %s\n"
+            "(default: disabled)",
+            get_all_kv_cache_types().c_str()
+        ),
+        [](common_params & params, const std::string & value) {
+            params.fake_quant_ffn_norm_enabled = true;
+            params.fake_quant_type = kv_cache_type_from_str(value);
+        }
+    ).set_env("LLAMA_ARG_FAKE_QUANT_FFN_NORM"));
+    add_opt(common_arg(
+        {"--fake-quant-layer"}, "INT",
+        "target layer for FFN norm fake quantization (21 for TinyLlama last layer) (default: 21)",
+        [](common_params & params, const std::string & value) {
+            params.fake_quant_target_layer = std::stoi(value);
+        }
+    ).set_env("LLAMA_ARG_FAKE_QUANT_LAYER"));
+    add_opt(common_arg(
         {"--hellaswag"},
         "compute HellaSwag score over random tasks from datafile supplied with -f",
         [](common_params & params) {

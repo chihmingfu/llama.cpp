@@ -38,6 +38,10 @@ struct llama_cparams {
     bool fake_quant_enabled;
     enum ggml_type fake_quant_type;
     float fake_quant_scale;
+    
+    // FFN norm fake quantization parameters
+    bool fake_quant_ffn_norm_enabled;
+    int  fake_quant_target_layer;
 
     enum llama_pooling_type pooling_type;
 
