@@ -4,6 +4,7 @@
 #include "llama-cparams.h"
 #include "llama-graph.h"
 #include "llama-adapter.h"
+#include "llama-fake-quant.h"
 
 #include "ggml-cpp.h"
 #include "ggml-opt.h"
@@ -225,6 +226,9 @@ private:
     llama_cparams       cparams;
     llama_adapter_cvec  cvec;
     llama_adapter_loras loras;
+    
+    // FFN norm fake quantization callback data
+    llama_ffn_norm_fake_quant_data ffn_norm_fake_quant_data;
 
     llama_cross cross; // TODO: tmp for handling cross-attention - need something better probably
 

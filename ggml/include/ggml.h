@@ -2387,6 +2387,9 @@ extern "C" {
     GGML_API void                          ggml_threadpool_params_init   (struct ggml_threadpool_params * p, int n_threads);
     GGML_API bool                          ggml_threadpool_params_match  (const struct ggml_threadpool_params * p0, const struct ggml_threadpool_params * p1);
 
+    // Fake quantization support
+    GGML_API void ggml_fake_quant_set_global_params(bool enabled, int target_type, int target_layer);
+
 #ifdef  __cplusplus
 }
 #endif

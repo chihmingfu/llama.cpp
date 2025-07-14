@@ -9,6 +9,93 @@
 
 #include <float.h>
 
+// Fake quantization state for GGML-level operations
+static struct {
+    bool enabled;
+    int target_type; // Use int instead of ggml_type to avoid includes
+    int target_layer;
+} g_ggml_fake_quant_state = {false, 0, -1};
+
+// Set global fake quantization parameters for GGML-level operations
+void ggml_fake_quant_set_global_params(bool enabled, int target_type, int target_layer) {
+    g_ggml_fake_quant_state.enabled = enabled;
+    g_ggml_fake_quant_state.target_type = target_type;
+    g_ggml_fake_quant_state.target_layer = target_layer;
+}
+
+// Apply BF16 fake quantization to data
+static void apply_bf16_fake_quant(float * data, size_t n_elements) {
+    for (size_t i = 0; i < n_elements; i++) {
+        ggml_bf16_t bf16_val = ggml_compute_fp32_to_bf16(data[i]);
+        data[i] = ggml_compute_bf16_to_fp32(bf16_val);
+    }
+}
+
+// Counter to track normalization operations per layer
+static int g_norm_counter = 0;
+static int g_current_layer = -1;
+
+// Check if fake quantization should be applied to RMS norm result
+static bool should_apply_fake_quant_rms_norm(const struct ggml_tensor * tensor) {
+    if (!g_ggml_fake_quant_state.enabled || !tensor || !tensor->name) {
+        return false;
+    }
+    
+    // Try to extract layer number from norm tensor name (e.g., "norm-21")
+    int layer_num = -1;
+    if (sscanf(tensor->name, "norm-%d", &layer_num) == 1) {
+        // Reset counter when moving to new layer
+        if (layer_num != g_current_layer) {
+            g_current_layer = layer_num;
+            g_norm_counter = 0;
+        }
+        g_norm_counter++;
+        
+        // In transformer architecture, typically:
+        // 1st norm per layer = attention norm
+        // 2nd norm per layer = FFN norm
+        // We want the FFN norm (2nd occurrence per layer)
+        bool is_ffn_norm = (g_norm_counter == 2);
+        
+        // Check if this is the target layer and FFN norm
+        bool is_target_layer = (g_ggml_fake_quant_state.target_layer == -1 || layer_num == g_ggml_fake_quant_state.target_layer);
+        
+        return is_target_layer && is_ffn_norm;
+    }
+    
+    // Also check for original naming pattern (blk.X.ffn_norm)
+    if (strstr(tensor->name, "ffn_norm") != NULL) {
+        if (sscanf(tensor->name, "blk.%d.ffn_norm", &layer_num) == 1) {
+            return (g_ggml_fake_quant_state.target_layer == -1 || layer_num == g_ggml_fake_quant_state.target_layer);
+        }
+    }
+    
+    return false;
+}
+
+// Apply fake quantization to RMS norm computation result
+static void apply_fake_quant_rms_norm_result(float * data, size_t n_elements, const char * tensor_name) {
+    if (!g_ggml_fake_quant_state.enabled || !data || n_elements == 0) {
+        return;
+    }
+    
+    // Store original values for verification
+    float original_first = data[0];
+    float original_last = data[n_elements - 1];
+    
+    // Apply BF16 fake quantization (assuming target_type is BF16)
+    apply_bf16_fake_quant(data, n_elements);
+    
+    // Verify quantization was applied
+    float quantized_first = data[0];
+    float quantized_last = data[n_elements - 1];
+    
+    printf("FFN norm fake quantization (BF16): %s - diff: first=%.6f, last=%.6f\n", 
+           tensor_name ? tensor_name : "unknown",
+           fabs(original_first - quantized_first),
+           fabs(original_last - quantized_last));
+}
+
 // ggml_compute_forward_dup
 
 static void ggml_compute_forward_dup_same_cont(
@@ -4016,6 +4103,11 @@ static void ggml_compute_forward_rms_norm_f32(
                 const float scale = 1.0f/sqrtf(mean + eps);
 
                 ggml_vec_scale_f32(ne00, y, scale);
+                
+                // Apply fake quantization if enabled for this tensor
+                if (g_ggml_fake_quant_state.enabled && should_apply_fake_quant_rms_norm(dst)) {
+                    apply_fake_quant_rms_norm_result(y, ne00, dst->name);
+                }
             }
         }
     }

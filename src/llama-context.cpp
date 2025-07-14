@@ -64,9 +64,25 @@ llama_context::llama_context(
     cparams.fake_quant_type = params.fake_quant_type;
     cparams.fake_quant_scale = params.fake_quant_scale;
     
+    // FFN norm fake quantization parameters
+    cparams.fake_quant_ffn_norm_enabled = params.fake_quant_ffn_norm_enabled;
+    cparams.fake_quant_target_layer = params.fake_quant_target_layer;
+    
     if (cparams.fake_quant_enabled) {
         LLAMA_LOG_INFO("%s: fake quantization enabled: type=%s scale=%.2f\n", 
                        __func__, ggml_type_name(cparams.fake_quant_type), cparams.fake_quant_scale);
+    }
+    
+    if (cparams.fake_quant_ffn_norm_enabled) {
+        LLAMA_LOG_INFO("%s: FFN norm fake quantization enabled: type=%s target_layer=%d\n", 
+                       __func__, ggml_type_name(cparams.fake_quant_type), cparams.fake_quant_target_layer);
+                       
+        // Set global fake quantization parameters for GGML-level operations
+        ggml_fake_quant_set_global_params(
+            true,
+            (int)cparams.fake_quant_type, 
+            cparams.fake_quant_target_layer
+        );
     }
 
     auto rope_scaling_type = params.rope_scaling_type;
@@ -354,6 +370,11 @@ llama_context::llama_context(
 }
 
 llama_context::~llama_context() {
+    // Clean up global fake quantization state
+    if (cparams.fake_quant_ffn_norm_enabled) {
+        ggml_fake_quant_set_global_params(false, 0, -1);
+    }
+    
     ggml_opt_free(opt_ctx);
 }
 

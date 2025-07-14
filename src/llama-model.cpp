@@ -5082,17 +5082,6 @@ struct llm_build_llama : public llm_graph_context {
                         model.layers[il].ffn_norm, NULL,
                         LLM_NORM_RMS, il);
                 cb(cur, "ffn_norm", il);
-                
-                // Apply FFN norm fake quantization for specified layer
-                if (cparams.fake_quant_ffn_norm_enabled && il == cparams.fake_quant_target_layer) {
-                    if (cur->type == GGML_TYPE_F32 && cur->data != nullptr) {
-                        float* data = (float*)cur->data;
-                        size_t n_elements = ggml_nelements(cur);
-                        llama_fake_quantize_data(data, n_elements, cparams.fake_quant_type);
-                        
-                        LLAMA_LOG_INFO("Applied FFN norm fake quantization to layer %d, elements %zu\n", il, n_elements);
-                    }
-                }
 
                 cur = build_ffn(cur,
                         model.layers[il].ffn_up,   model.layers[il].ffn_up_b,   NULL,
