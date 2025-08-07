@@ -83,12 +83,16 @@ cmake --build build --config Release
 cmake -B build -DLLAMA_BUILD_TESTS=ON
 cmake --build build --config Release
 
+# Run all tests
+ctest --test-dir build --output-on-failure
+
 # Run specific tests
 ./build/bin/test-tokenizer-0
 ./build/bin/test-grammar-parser
 ./build/bin/test-sampling
 ./build/bin/test-quantize-fns
 ./build/bin/test-llama-grammar
+./build/bin/test-backend-ops
 ```
 
 **Server tests:**
@@ -112,6 +116,11 @@ cd tools/mtmd && ./tests.sh
 cd tools/server/tests && ./tests.sh
 ```
 
+**Local CI (run before publishing):**
+```bash
+ci/run.sh
+```
+
 ## Code Quality Tools
 
 **Formatting and Linting:**
@@ -124,6 +133,9 @@ clang-tidy src/**/*.cpp
 
 # Python formatting and linting
 python -m flake8
+
+# Python type checking
+mypy --ignore-missing-imports --allow-redefinition --no-namespace-packages --non-interactive .
 
 # Pre-commit hooks
 pre-commit run --all-files
@@ -232,6 +244,20 @@ All tools are built to `build/bin/` directory:
 4. **Performance optimization:** See `docs/development/token_generation_performance_tips.md`
 5. **Testing:** Run relevant test suites before submitting changes
 6. **Python linting:** Use flake8 for Python scripts
+7. **Local CI:** Run `ci/run.sh` before publishing PRs
+
+## Code Standards
+
+**C++ coding style:**
+- 4 spaces indentation, brackets on same line
+- Use sized integer types (`int32_t`) in public APIs
+- Vertical alignment for readability
+- Avoid third-party dependencies
+
+**Commit format:**
+- Squash-merge PRs with format: `<module> : <commit title> (#<issue_number>)`
+- One feature/fix per PR
+- Reference issues in commit messages
 
 ## Dependencies
 
