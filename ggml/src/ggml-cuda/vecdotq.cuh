@@ -4,6 +4,10 @@
 
 #include <cstdint>
 
+#ifdef GGML_CUDA_CUTLASS_FP4
+#include "cutlass_mxfp4_native.cuh"
+#endif
+
 static __device__ __forceinline__ int get_int_b1(const void * x, const int & i32) {
     const uint8_t * x8 = (const uint8_t *) x;
 
@@ -243,6 +247,14 @@ template <int vdr> static __device__ __forceinline__ float vec_dot_q8_0_16_q8_1_
 static __device__ __forceinline__ float vec_dot_mxfp4_q8_1(
     const void * __restrict__ vbq, const block_q8_1 * __restrict__ bq8_1, const int & kbx, const int & iqs) {
 
+#ifdef GGML_CUDA_CUTLASS_FP4
+    // Use CUTLASS native FP4 tensor core implementation for RTX 5070+ (Blackwell SM120)
+    if (cutlass_native_fp4::is_blackwell_sm120_supported()) {
+        return cutlass_native_fp4::vec_dot_mxfp4_native_mmvq(vbq, bq8_1, kbx, iqs);
+    }
+#endif
+    
+    // Fallback to original INT8 DP4A implementation for older GPUs
     const block_mxfp4 * bq4 = (const block_mxfp4 *) vbq + kbx;
 
     const int * q8 = (const int *) bq8_1->qs + iqs;

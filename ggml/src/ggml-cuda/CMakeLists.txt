@@ -64,6 +64,24 @@ if (CUDAToolkit_FOUND)
         list(APPEND GGML_SOURCES_CUDA ${SRCS})
     endif()
 
+    # CUTLASS FP4 integration
+    if (GGML_CUDA_CUTLASS_FP4)
+        if (NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../../vendor/cutlass")
+            message(FATAL_ERROR "CUTLASS not found. Please add CUTLASS as a submodule:\n"
+                                "git submodule add https://github.com/NVIDIA/cutlass.git vendor/cutlass")
+        endif()
+        
+        # Configure CUTLASS for FP4 acceleration
+        set(CUTLASS_NVCC_ARCHS ${GGML_CUTLASS_NVCC_ARCHS} CACHE STRING "CUTLASS target architectures")
+        set(CUTLASS_ENABLE_EXAMPLES OFF CACHE BOOL "Disable CUTLASS examples")
+        set(CUTLASS_ENABLE_TOOLS OFF CACHE BOOL "Disable CUTLASS tools") 
+        
+        # Add CUTLASS subdirectory
+        add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../../vendor/cutlass" cutlass EXCLUDE_FROM_ALL)
+        
+        message(STATUS "CUTLASS FP4 acceleration enabled for architectures: ${GGML_CUTLASS_NVCC_ARCHS}")
+    endif()
+
     ggml_add_backend_library(ggml-cuda
                              ${GGML_HEADERS_CUDA}
                              ${GGML_SOURCES_CUDA}
@@ -99,6 +117,10 @@ if (CUDAToolkit_FOUND)
         add_compile_definitions(GGML_CUDA_NO_PEER_COPY)
     endif()
 
+    if (GGML_CUDA_CUTLASS_FP4)
+        add_compile_definitions(GGML_CUDA_CUTLASS_FP4)
+    endif()
+
     if (GGML_STATIC)
         if (WIN32)
             # As of 12.3.1 CUDA Toolkit for Windows does not offer a static cublas library
@@ -114,6 +136,14 @@ if (CUDAToolkit_FOUND)
         # No VMM requested, no need to link directly with the cuda driver lib (libcuda.so)
     else()
         target_link_libraries(ggml-cuda PRIVATE CUDA::cuda_driver)
+    endif()
+
+    # Link CUTLASS for FP4 acceleration
+    if (GGML_CUDA_CUTLASS_FP4)
+        # CUTLASS is header-only for our usage, just include directories
+        target_include_directories(ggml-cuda PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../../../vendor/cutlass/include")
+        target_include_directories(ggml-cuda PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../../../vendor/cutlass/tools/util/include")
+        message(STATUS "Including CUTLASS headers for FP4 acceleration")
     endif()
 
     set(CUDA_CXX_FLAGS "")

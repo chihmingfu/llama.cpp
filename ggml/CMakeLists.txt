@@ -170,6 +170,12 @@ set   (GGML_CUDA_COMPRESSION_MODE "size" CACHE STRING
                                             "ggml: cuda link binary compression mode; requires cuda 12.8+")
 set_property(CACHE GGML_CUDA_COMPRESSION_MODE PROPERTY STRINGS "none;speed;balance;size")
 
+# CUTLASS FP4 acceleration support  
+option(GGML_CUDA_CUTLASS_FP4                 "ggml: use CUTLASS for FP4 acceleration (Blackwell+)"  OFF)
+set   (GGML_CUTLASS_NVCC_ARCHS "100;120" CACHE STRING
+                                            "ggml: CUTLASS target architectures for FP4")
+set_property(CACHE GGML_CUTLASS_NVCC_ARCHS PROPERTY STRINGS "100" "100;120" "120")
+
 option(GGML_HIP                             "ggml: use HIP"                                   OFF)
 option(GGML_HIP_GRAPHS                      "ggml: use HIP graph, experimental, slow"         OFF)
 option(GGML_HIP_NO_VMM                      "ggml: do not try to use HIP VMM"                 ON)
