@@ -1,8 +1,8 @@
-# CUDA 13.0 升級部署指南
+# CUDA 13.0 升級部署指南 (更新: 實測結果)
 
 **日期**: 2025年8月11日  
 **目的**: 升級至 CUDA 13.0 以支援 RTX 5070 原生 FP4 tensor core  
-**狀態**: 📋 部署規劃文檔
+**狀態**: ✅ 升級完成，⚠️ FP4 指令編譯問題待解決
 
 ## 🎯 執行摘要
 
@@ -257,7 +257,39 @@ wget https://huggingface.co/microsoft/DialoGPT-small/resolve/main/pytorch_model.
 
 ---
 
-**建議**: 立即開始宿主機升級，這是啟用真正原生 FP4 tensor core 加速的關鍵步驟。升級完成後，我們將見證 llama.cpp 歷史上第一次真正的硬體 FP4 加速！
+## 📊 實測結果更新 (2025年8月11日)
+
+### **升級狀態**
+- ✅ **CUDA 13.0 成功安裝**: `nvcc --version` 顯示 13.0.48
+- ✅ **驅動版本正確**: nvidia-smi 顯示 Driver 580.65.06, CUDA 13.0
+- ✅ **RTX 5070 識別**: SM12.0 (Blackwell) 正確識別
+- ✅ **CUTLASS 4.1 整合**: CMake 成功配置 CUTLASS FP4 支援
+
+### **編譯測試結果**
+
+#### 發現的問題
+編譯時 ptxas 報告以下錯誤：
+```
+ptxas: error: Instruction 'mma with FP6/FP4 floating point type' not supported on .target 'sm_120'
+ptxas: error: .kind::f8f6f4 modifier required for instruction 'mma'
+ptxas: error: Feature '.kind::f8f6f4' not supported on .target 'sm_120'
+```
+
+#### 問題分析
+1. **CUTLASS 正確使用 SM120 MMA 指令** - 使用 `cute::SM120_16x8x32_TN` (不是 wgmma，wgmma 是 SM90 Hopper 用的)
+2. **CUTLASS 4.1 生成的 PTX 指令不被支援** - 具體發現：
+   - CUTLASS 生成 `mma.sync.aligned.kind::f8f6f4` 指令
+   - PTX assembler 報告 `.kind::f8f6f4` modifier 在 SM120 上不支援
+   - 這表示 Blackwell 的 FP4 支援可能使用不同的 PTX 語法
+3. **版本相容性問題** - CUTLASS 4.1.0 預期 CUDA 12.8+，但實際 PTX 支援可能不完整
+
+### **下一步行動**
+1. 等待 NVIDIA 更新 PTX ISA 以完整支援 SM120 FP4 指令
+2. 考慮更新至更新版本的 CUTLASS (當可用時)
+3. 聯繫 NVIDIA 開發者社區確認 `.kind::f8f6f4` modifier 的支援狀態
+4. 暫時使用 INT8 DP4A 路徑，效能仍然優秀 (489.48 t/s)
+
+**建議**: CUDA 13.0 升級成功，但 FP4 原生支援需要進一步調查正確的指令格式。目前 MXFP4 仍可通過 INT8 路徑正常工作。
 
 **最後更新**: 2025年8月11日  
-**預期完成**: CUDA 13.0 升級後即刻可用
+**當前狀態**: 工具鏈升級完成，FP4 指令格式調查中

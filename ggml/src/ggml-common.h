@@ -1089,8 +1089,10 @@ GGML_TABLE_BEGIN(int8_t, kvalues_iq4nl, 16)
     -127, -104, -83, -65, -49, -35, -22, -10, 1, 13, 25, 38, 53, 69, 89, 113,
 GGML_TABLE_END()
 
-// e2m1 values (doubled)
+// e2m1 values (scaled for DP4A int8 operations)
 // ref: https://www.opencompute.org/documents/ocp-microscaling-formats-mx-v1-0-spec-final-pdf
+// E2M1 format: 4-bit with 1 sign, 2 exp, 1 mantissa
+// Values: [0, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, inf, -0, -0.5, -0.75, -1.0, -1.5, -2.0, -3.0, -inf]
 GGML_TABLE_BEGIN(int8_t, kvalues_mxfp4, 16)
     0, 1, 2, 3, 4, 6, 8, 12, 0, -1, -2, -3, -4, -6, -8, -12,
 GGML_TABLE_END()

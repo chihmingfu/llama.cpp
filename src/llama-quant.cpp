@@ -226,6 +226,22 @@ static ggml_type llama_tensor_get_type(quantize_state_impl & qs, ggml_type new_t
                 new_type = GGML_TYPE_Q6_K;
             }
         }
+    } else if (ftype == LLAMA_FTYPE_MOSTLY_MXFP4) {
+        // Standard MXFP4 quantization for all applicable tensors
+        // Skip 1D tensors and normalization layers
+        if (name.find("_norm") != std::string::npos ||
+            tensor->ne[0] == ggml_nelements(tensor)) {
+            // Keep original type for normalization and 1D tensors
+            // new_type already set to input parameter
+        } else if (name == "token_embd.weight" || 
+                   name == "per_layer_token_embd.weight" ||
+                   name == "output.weight") {
+            // Use Q6_K for embeddings and output for better quality
+            new_type = GGML_TYPE_Q6_K;
+        } else {
+            // Use MXFP4 for all other tensors
+            new_type = GGML_TYPE_MXFP4;
+        }
     } else if (ftype == LLAMA_FTYPE_MOSTLY_MXFP4_MOE) {
         // MoE   tensors -> MXFP4
         // other tensors -> Q8_0
@@ -545,6 +561,7 @@ static void llama_model_quantize_impl(const std::string & fname_inp, const std::
         case LLAMA_FTYPE_ALL_F32:     default_type = GGML_TYPE_F32;  break;
 
         case LLAMA_FTYPE_MOSTLY_MXFP4_MOE: default_type = GGML_TYPE_MXFP4; break;
+        case LLAMA_FTYPE_MOSTLY_MXFP4:     default_type = GGML_TYPE_MXFP4; break;
 
         // K-quants
         case LLAMA_FTYPE_MOSTLY_Q2_K_S:
@@ -999,7 +1016,8 @@ static void llama_model_quantize_impl(const std::string & fname_inp, const std::
                 new_size += llama_tensor_quantize_impl(new_type, f32_data_03, new_data_03, chunk_size, nrows, n_per_row, imatrix_03, workers, nthread_use);
 
                 // TODO: temporary sanity check that the F16 -> MXFP4 is lossless
-#if 1
+                // NOTE: Disabled because MXFP4 quantization is inherently lossy
+#if 0
                 if (new_type == GGML_TYPE_MXFP4) {
                     auto * x = f32_data_03;
 

@@ -176,6 +176,9 @@ set   (GGML_CUTLASS_NVCC_ARCHS "100;120" CACHE STRING
                                             "ggml: CUTLASS target architectures for FP4")
 set_property(CACHE GGML_CUTLASS_NVCC_ARCHS PROPERTY STRINGS "100" "100;120" "120")
 
+# Native CUDA 13.0 FP4 instructions support
+option(GGML_CUDA_NATIVE_FP4                  "ggml: use CUDA 13.0 native FP4 instructions (RTX 5070+)" ON)
+
 option(GGML_HIP                             "ggml: use HIP"                                   OFF)
 option(GGML_HIP_GRAPHS                      "ggml: use HIP graph, experimental, slow"         OFF)
 option(GGML_HIP_NO_VMM                      "ggml: do not try to use HIP VMM"                 ON)

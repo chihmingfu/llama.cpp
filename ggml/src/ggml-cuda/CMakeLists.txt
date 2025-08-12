@@ -120,6 +120,11 @@ if (CUDAToolkit_FOUND)
     if (GGML_CUDA_CUTLASS_FP4)
         add_compile_definitions(GGML_CUDA_CUTLASS_FP4)
     endif()
+    
+    if (GGML_CUDA_NATIVE_FP4)
+        add_compile_definitions(GGML_CUDA_NATIVE_FP4)
+        message(STATUS "Enabling CUDA 13.0 native FP4 instructions support")
+    endif()
 
     if (GGML_STATIC)
         if (WIN32)
